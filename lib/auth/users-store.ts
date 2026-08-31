@@ -1,13 +1,30 @@
-// Persistência e autenticação de usuários (server-only). data/users.json.
+// Persistência e autenticação de usuários (server-only).
+// PostgreSQL quando DATABASE_URL está definida; senão, data/users.json.
 
 import { promises as fs } from "fs";
 import path from "path";
+import { dbEnabled, q } from "../db";
 import { withLock } from "../lock";
 import { hashSenha, verifySenha } from "./hash";
 import { DEFAULT_USERS, type Role, type StoredUser, type User } from "./users";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
+
+type UserRow = {
+  email: string;
+  nome: string;
+  role: Role;
+  senha_hash: string;
+  senha_padrao: boolean;
+};
+const rowToUser = (r: UserRow): StoredUser => ({
+  email: r.email,
+  nome: r.nome,
+  role: r.role,
+  senhaHash: r.senha_hash,
+  senhaPadrao: r.senha_padrao,
+});
 
 async function readRaw(): Promise<StoredUser[] | null> {
   try {
@@ -21,8 +38,22 @@ async function writeRaw(list: StoredUser[]) {
   await fs.writeFile(USERS_FILE, JSON.stringify(list, null, 2), "utf-8");
 }
 
-/** Usuários com hash; semeia data/users.json a partir de DEFAULT_USERS na 1ª vez. */
+/** Usuários com hash; semeia a partir de DEFAULT_USERS na 1ª vez. */
 export async function getUsers(): Promise<StoredUser[]> {
+  if (dbEnabled()) {
+    const rows = await q<UserRow>("SELECT * FROM users ORDER BY nome");
+    if (rows.length) return rows.map(rowToUser);
+    // semeia os usuários iniciais (senha padrão, já com hash)
+    for (const u of DEFAULT_USERS) {
+      await q(
+        `INSERT INTO users (email, nome, role, senha_hash, senha_padrao)
+         VALUES ($1, $2, $3, $4, TRUE) ON CONFLICT (email) DO NOTHING`,
+        [u.email, u.nome, u.role, await hashSenha(u.senha)],
+      );
+    }
+    const seeded = await q<UserRow>("SELECT * FROM users ORDER BY nome");
+    return seeded.map(rowToUser);
+  }
   const existing = await readRaw();
   if (existing) return existing;
   const seeded: StoredUser[] = [];
@@ -88,6 +119,14 @@ export async function createUser(input: {
   senha: string;
 }): Promise<void> {
   const senhaHash = await hashSenha(input.senha);
+  if (dbEnabled()) {
+    await q(
+      `INSERT INTO users (email, nome, role, senha_hash, senha_padrao)
+       VALUES ($1, $2, $3, $4, FALSE)`,
+      [input.email.trim().toLowerCase(), input.nome.trim(), input.role, senhaHash],
+    );
+    return;
+  }
   await withLock("users", async () => {
     const list = await getUsers();
     list.push({
@@ -106,6 +145,22 @@ export async function updateUser(
   patch: { nome?: string; role?: Role; senha?: string },
 ): Promise<void> {
   const senhaHash = patch.senha ? await hashSenha(patch.senha) : null;
+  if (dbEnabled()) {
+    const e = email.trim().toLowerCase();
+    if (patch.nome !== undefined) {
+      await q("UPDATE users SET nome = $2 WHERE email = $1", [e, patch.nome.trim()]);
+    }
+    if (patch.role !== undefined) {
+      await q("UPDATE users SET role = $2 WHERE email = $1", [e, patch.role]);
+    }
+    if (senhaHash) {
+      await q(
+        "UPDATE users SET senha_hash = $2, senha_padrao = FALSE WHERE email = $1",
+        [e, senhaHash],
+      );
+    }
+    return;
+  }
   await withLock("users", async () => {
     const list = await getUsers();
     const e = email.trim().toLowerCase();
@@ -122,6 +177,10 @@ export async function updateUser(
 }
 
 export async function deleteUser(email: string): Promise<void> {
+  if (dbEnabled()) {
+    await q("DELETE FROM users WHERE email = $1", [email.trim().toLowerCase()]);
+    return;
+  }
   await withLock("users", async () => {
     const list = await getUsers();
     const e = email.trim().toLowerCase();
