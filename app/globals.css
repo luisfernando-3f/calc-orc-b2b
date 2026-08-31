@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Design System 3F (grafite) — mesma base do dre-control.
+   Cenários mapeados nos faróis 3F: pessimista=neg, realista=grafite,
+   otimista=pos.
+============================================================ */
+:root {
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --surface-alt: #eff0f1;
+  --ink: #1c1f24;
+  --ink-2: #4a4f57;
+  --ink-3: #8a9099;
+  --line: #e3e4e4;
+  --brand: #2d3036;
+  --brand-2: #3a3f47;
+  --accent: #4a5560;
+  --accent-bg: #eceeee;
+  --pos: #0f8a5f;
+  --pos-bg: #e7f5ef;
+  --neg: #d1495b;
+  --neg-bg: #fbebed;
+
+  /* cenários */
+  --sc-pess: var(--neg);
+  --sc-pess-bg: var(--neg-bg);
+  --sc-real: var(--brand);
+  --sc-real-bg: var(--accent-bg);
+  --sc-otim: var(--pos);
+  --sc-otim-bg: var(--pos-bg);
+
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(28, 31, 36, 0.05), 0 4px 20px rgba(28, 31, 36, 0.04);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-accent: var(--accent);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --font-sans: "Mozilla Text", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "IBM Plex Mono", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Remove as setinhas dos number inputs (o vendedor digita) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ---------- Impressão / PDF ---------- */
+.print-only {
+  display: none;
+}
+@media print {
+  body {
+    background: #fff;
+  }
+  /* Esconde tudo (sidebar, calculadora on-screen) e mostra só o relatório. */
+  body * {
+    visibility: hidden;
+  }
+  .print-only,
+  .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  /* Página de proposta (/proposta): imprime o conteúdo inteiro, não o esquema
+     print-only da calculadora. Reverte o "visibility: hidden" global e mantém
+     as cores dos cards escuros (print-color-adjust). */
+  .proposta-root,
+  .proposta-root * {
+    visibility: visible !important;
+  }
+  .proposta-root {
+    position: static !important;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
