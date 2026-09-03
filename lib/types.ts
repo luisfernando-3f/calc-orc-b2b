@@ -224,6 +224,9 @@ export interface SimulationRecord {
   sellerEmail: string;
   sellerNome: string;
   cliente: string;
+  telefone: string; // telefone do cliente (E.164) — usado para vincular o lead no GHL
+  nichoEspecifico: string; // subnicho (lista fechada, espelha opportunity.subnicho no GHL)
+  nichoOutro: string; // texto livre quando nichoEspecifico === "Outro"
   preparadoPor: string;
   observacoes: string;
   state: CalcState; // inputs completos (para reabrir na calculadora)

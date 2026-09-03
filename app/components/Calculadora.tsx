@@ -17,6 +17,8 @@ import {
 import { fmtBRL, fmtMeses, fmtMult, fmtNum, fmtPct, hojeBR } from "@/lib/format";
 import { matchCampaign } from "@/lib/campaigns";
 import { calcPagamentos } from "@/lib/pagamentos";
+import { normalizePhoneBR } from "@/lib/phone";
+import { NICHO_ESPECIFICO_OPTIONS } from "@/lib/nichoEspecifico";
 import type {
   AppConfig,
   CalcResult,
@@ -67,6 +69,9 @@ export default function Calculadora({
 }) {
   const [state, setState] = useState<CalcState>(initialSim?.state ?? emptyState);
   const [cliente, setCliente] = useState(initialSim?.cliente ?? "");
+  const [telefone, setTelefone] = useState(initialSim?.telefone ?? "");
+  const [nichoEspecifico, setNichoEspecifico] = useState(initialSim?.nichoEspecifico ?? "");
+  const [nichoOutro, setNichoOutro] = useState(initialSim?.nichoOutro ?? "");
   const [preparadoPor, setPreparadoPor] = useState(
     initialSim?.preparadoPor ?? user.nome ?? "",
   );
@@ -194,6 +199,9 @@ export default function Calculadora({
       exportado: exportando,
       state,
       cliente,
+      telefone: normalizePhoneBR(telefone),
+      nichoEspecifico,
+      nichoOutro,
       preparadoPor,
       observacoes,
       prestacaoAplicada: presAplic,
@@ -240,6 +248,26 @@ export default function Calculadora({
     const id = await salvarSimulacao(false, { forcarPrestacao: true });
     setGerandoProposta(false);
     if (id) window.open(`/proposta/${id}`, "_blank", "noopener");
+
+    // Envia nicho específico, ticket médio e ciclo de venda para o GHL,
+    // vinculando pelo telefone do cliente. Não bloqueia a abertura da
+    // proposta se o telefone estiver vazio ou o envio falhar.
+    const telefoneNormalizado = normalizePhoneBR(telefone);
+    if (telefoneNormalizado) {
+      void fetch("/api/webhooks/ghl-proposta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefone: telefoneNormalizado,
+          nichoEspecifico,
+          nichoOutro: nichoEspecifico === "Outros" ? nichoOutro : "",
+          ticketMedio: state.ticket,
+          cicloVendaDias: state.cicloDias,
+        }),
+      }).catch(() => {
+        // não bloqueia a proposta se o envio ao GHL falhar
+      });
+    }
   };
 
   // Auto-save: assim que o Ponto de partida está preenchido, grava/atualiza o
@@ -255,6 +283,9 @@ export default function Calculadora({
     pontoPartidaCompleto,
     state,
     cliente,
+    telefone,
+    nichoEspecifico,
+    nichoOutro,
     preparadoPor,
     observacoes,
     prestacaoAplicada,
@@ -296,6 +327,9 @@ export default function Calculadora({
   const reset = () => {
     setState(emptyState);
     setCliente("");
+    setTelefone("");
+    setNichoEspecifico("");
+    setNichoOutro("");
     setPreparadoPor(user.nome ?? "");
     setObservacoes("");
     setDataCall(hojeBR());
@@ -359,6 +393,45 @@ export default function Calculadora({
             <Field label="Data" htmlFor="dataCall">
               <TextInput id="dataCall" value={dataCall} onValue={setDataCall} />
             </Field>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4">
+            <Field
+              label="Telefone do cliente"
+              htmlFor="telefoneCliente"
+              hint="Usado para vincular a proposta ao contato certo no GHL."
+            >
+              <TextInput
+                id="telefoneCliente"
+                value={telefone}
+                onValue={setTelefone}
+                placeholder="(11) 99999-9999"
+              />
+            </Field>
+            <Field label="Nicho específico" htmlFor="nichoEspecifico">
+              <select
+                id="nichoEspecifico"
+                value={nichoEspecifico}
+                onChange={(e) => setNichoEspecifico(e.target.value)}
+                className="w-full border-[1.5px] border-line rounded-lg px-3 py-2.5 text-[14px] text-ink bg-surface font-medium focus:outline-none focus:border-brand"
+              >
+                <option value="">Selecione o subnicho…</option>
+                {NICHO_ESPECIFICO_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {nichoEspecifico === "Outros" && (
+              <Field label='Qual? (nicho específico "Outros")' htmlFor="nichoOutro">
+                <TextInput
+                  id="nichoOutro"
+                  value={nichoOutro}
+                  onValue={setNichoOutro}
+                  placeholder="Descreva o subnicho"
+                />
+              </Field>
+            )}
           </div>
         </Card>
 
