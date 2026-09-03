@@ -429,7 +429,7 @@ export default function Calculadora({
         >
           {ghlLeads.length > 0 && (
             <Field
-              label="Puxar lead do GHL (Reunião agendada)"
+              label="Dados do CRM"
               htmlFor="ghlLeadSelect"
               hint="Opcional — preenche nome, telefone e nicho automaticamente."
               className="mb-5"
