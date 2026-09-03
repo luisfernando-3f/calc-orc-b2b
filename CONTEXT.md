@@ -189,3 +189,16 @@ A partir dos debriefings da operação (relatórios por cliente: ROAS, faturamen
 - **Vendedor:** `/cases` (antes placeholder) — `CasesShowcase`: cards **anonimizados** ("Cliente de <nicho>"), **filtráveis por nicho** (decisão do usuário), com métricas + destaque. Prova social relevante ao prospect na call.
 - **Calibração (decisão do usuário):** `lib/cases.ts` `cplRealPorNicho` calcula o CPL real médio dos cases publicados por nicho; no editor `Ponto de partida`, cada nicho mostra "real: R$X (n) ↑" com clique para **aplicar** o CPL real ao benchmark — fecha o loop de dados sem sobrescrever nada automaticamente (o admin decide e salva).
 - **Roadmap:** import assistido do relatório (extrair/pré-preencher) fica para v2 — formatos variam demais. Link compartilhável do case (como a proposta) é um próximo passo natural.
+
+## 17. Produção e banco de dados (deploy realizado)
+
+**No ar:** https://calculadora-resultado.3fventure.tech (VPS Hostinger 72.60.247.133, Ubuntu 24.04).
+
+- **App:** PM2 `calc-orc-b2b` (fork, 1 instância), porta **3100** — a VPS hospeda ~30 apps da 3F; a 3000 já estava ocupada. Código em `/opt/apps/calc-orc-b2b` (clone do GitHub `luisfernando-3f/calc-orc-b2b`).
+- **Nginx:** `/etc/nginx/sites-available/calculadora-resultado.3fventure.tech` → proxy para 3100. **HTTPS** via Certbot/Let's Encrypt (não há wildcard na VPS; cada subdomínio tem cert próprio), com `--redirect` e renovação automática.
+- **Banco:** **PostgreSQL 17 na porta 5433** (instância compartilhada da VPS), database `calc_orc_b2b`, usuário dedicado `calc_app` (owner do db e do schema public — o GRANT no schema é obrigatório no PG 15+).
+- **Modo dual:** `lib/db.ts` + `store.ts`/`users-store.ts` usam Postgres **quando `DATABASE_URL` existe**; sem ela, caem nos arquivos JSON (dev local). Mesma API pública. As tabelas são criadas sozinhas (`ensureSchema`, idempotente) no primeiro acesso: `users`, `app_config`, `simulations`, `campaigns`, `cases` — registros em **JSONB** + colunas indexadas (seller_email, share_token, updated_at). `registerShareView`/`setSimulationStatus` fazem update atômico no JSONB.
+- **Env (`.env.production`, só na VPS):** `AUTH_SECRET` (openssl rand -hex 32) e `DATABASE_URL`. **Reiniciar sempre com `pm2 restart calc-orc-b2b --update-env`** — sem `--update-env` o PM2 mantém o ambiente antigo e o app ignora o banco.
+- **Seed:** `scripts/seed-inicial.mjs` (config + 3 cases) e `scripts/migrate-to-db.mjs` (importa data/*.json). Usuários iniciais são semeados pelo próprio app, com hash.
+- **Atualizar:** `git pull && npm ci && npm run build && pm2 reload calc-orc-b2b`.
+- **Backup:** `pg_dump -h 127.0.0.1 -p 5433 -U calc_app calc_orc_b2b | gzip > backup.sql.gz`.
