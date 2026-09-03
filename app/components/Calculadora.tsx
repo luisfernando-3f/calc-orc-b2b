@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AMOSTRA_FRACA, getActiveRates, getNicho } from "@/lib/benchmarks";
+import { getActiveRates, getNicho } from "@/lib/benchmarks";
 import {
   activeCalc,
   buildSnowball,
@@ -151,7 +151,6 @@ export default function Calculadora({
   const isInvest = state.mode === "investimento";
   const bounds = config.rateBounds;
   const nicho = getNicho(config.nichos, state.nicho);
-  const amostraFraca = nicho ? nicho.base <= AMOSTRA_FRACA : false;
 
   // "Ponto de partida" preenchido → dispara o auto-save no histórico.
   const pontoPartidaCompleto =
@@ -588,14 +587,6 @@ export default function Calculadora({
                   step={0.01}
                 />
               </Field>
-
-              {amostraFraca && (
-                <p className="text-[12px] text-neg bg-neg-bg rounded-md px-3 py-2 -mt-1 mb-4 leading-snug">
-                  ⚠ Amostra pequena neste nicho ({nicho?.base}{" "}
-                  {nicho?.base === 1 ? "cliente" : "clientes"} com dado). Use o benchmark
-                  com ressalva verbal na call.
-                </p>
-              )}
 
               {isInvest ? (
                 <Field label="Investimento mensal em mídia (R$)" htmlFor="investimento">

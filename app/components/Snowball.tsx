@@ -41,7 +41,7 @@ export default function SnowballView({
   return (
     <div>
       {/* Payback banner */}
-      {paybackMonth !== null ? (
+      {paybackMonth !== null && (
         <div className="flex items-center gap-3.5 bg-pos-bg border border-pos/40 rounded-lg px-4 py-3.5 mb-5">
           <div className="text-[22px] font-bold text-pos tabular leading-none">
             Mês {paybackMonth}
@@ -51,16 +51,6 @@ export default function SnowballView({
             {showPrestacao ? " (mídia + prestação SEED)" : ""}, considerando o ciclo de
             venda de {fmtNum(cicloDias, 0)} dias (~{lag} {lag === 1 ? "mês" : "meses"}{" "}
             nesta tabela).
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3.5 bg-neg-bg border border-neg/40 rounded-lg px-4 py-3.5 mb-5">
-          <div className="text-[15px] font-bold text-neg leading-tight">
-            Payback não atingido
-          </div>
-          <div className="text-[13px] text-ink-2 leading-snug">
-            dentro da janela projetada — considere um investimento maior, um contrato mais
-            longo, ou revise as taxas de conversão com o cliente.
           </div>
         </div>
       )}
