@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/server";
 import { nichoMacroFromTags } from "@/lib/ghlMacroNicho";
-
-// Pipeline "02 - Pipeline CLOSER" / estágio "Reunião agendada" — leads prontos
-// pra call de vendas, usados para pré-preencher a calculadora.
-const PIPELINE_CLOSER_ID = "BUR0ElaJhjR9TvLZwMeD";
-const STAGE_REUNIAO_AGENDADA_ID = "98699748-b3eb-4bd6-aedb-fdba6d650beb";
-const FIELD_ID_SUBNICHO = "I3ztYS1QBgGZl6UrPQxY";
-const FIELD_ID_SUBNICHO_OUTRO = "aO6KYLcr6YCKJkezHnXL";
+import {
+  FIELD_ID_SUBNICHO,
+  FIELD_ID_SUBNICHO_OUTRO,
+  GHL_API_BASE,
+  PIPELINE_CLOSER_ID,
+  STAGE_REUNIAO_AGENDADA_ID,
+  ghlHeaders,
+} from "@/lib/ghlSeed";
 
 interface GhlOpportunity {
   id: string;
@@ -28,19 +29,15 @@ export async function GET() {
     return NextResponse.json({ error: "GHL não configurado" }, { status: 200 });
   }
 
-  const url = new URL("https://services.leadconnectorhq.com/opportunities/search");
-  url.searchParams.set("locationId", locationId);
-  url.searchParams.set("pipelineId", PIPELINE_CLOSER_ID);
-  url.searchParams.set("pipelineStageId", STAGE_REUNIAO_AGENDADA_ID);
+  const url = new URL(`${GHL_API_BASE}/opportunities/search`);
+  url.searchParams.set("location_id", locationId);
+  url.searchParams.set("pipeline_id", PIPELINE_CLOSER_ID);
+  url.searchParams.set("pipeline_stage_id", STAGE_REUNIAO_AGENDADA_ID);
   url.searchParams.set("limit", "100");
 
   try {
     const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Version: "2021-07-28",
-        Accept: "application/json",
-      },
+      headers: ghlHeaders(token),
       cache: "no-store",
     });
     if (!res.ok) {
