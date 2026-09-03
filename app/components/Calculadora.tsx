@@ -36,6 +36,16 @@ import SnowballView from "./Snowball";
 import PrintReport from "./PrintReport";
 import NotasPanel from "./NotasPanel";
 
+interface GhlLead {
+  opportunityId: string;
+  contactId: string;
+  cliente: string;
+  telefone: string;
+  nicho: string;
+  nichoEspecifico: string;
+  nichoOutro: string;
+}
+
 const SC: Record<Scenario, { label: string; color: string; bg: string }> = {
   pessimista: { label: "Pessimista", color: "var(--sc-pess)", bg: "var(--sc-pess-bg)" },
   realista: { label: "Realista", color: "var(--sc-real)", bg: "var(--sc-real-bg)" },
@@ -72,6 +82,11 @@ export default function Calculadora({
   const [telefone, setTelefone] = useState(initialSim?.telefone ?? "");
   const [nichoEspecifico, setNichoEspecifico] = useState(initialSim?.nichoEspecifico ?? "");
   const [nichoOutro, setNichoOutro] = useState(initialSim?.nichoOutro ?? "");
+  const [ghlLeads, setGhlLeads] = useState<GhlLead[]>([]);
+  const [ghlLeadsStatus, setGhlLeadsStatus] = useState<"loading" | "ready" | "erro">(
+    "loading",
+  );
+  const [selectedLeadId, setSelectedLeadId] = useState("");
   const [preparadoPor, setPreparadoPor] = useState(
     initialSim?.preparadoPor ?? user.nome ?? "",
   );
@@ -90,6 +105,44 @@ export default function Calculadora({
   );
 
   useEffect(() => setDataCall(hojeBR()), []);
+
+  // Leads em "Reunião agendada" (Pipeline CLOSER) — pré-preenchem os campos
+  // da call ao serem selecionados, evitando redigitar o que o SDR já coletou.
+  useEffect(() => {
+    let cancelado = false;
+    fetch("/api/ghl/leads-reuniao-agendada")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelado) return;
+        setGhlLeads(Array.isArray(data.leads) ? data.leads : []);
+        setGhlLeadsStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelado) setGhlLeadsStatus("erro");
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  const selecionarLeadGhl = (opportunityId: string) => {
+    setSelectedLeadId(opportunityId);
+    const lead = ghlLeads.find((l) => l.opportunityId === opportunityId);
+    if (!lead) return;
+    setCliente(lead.cliente);
+    setTelefone(lead.telefone);
+    setNichoEspecifico(lead.nichoEspecifico);
+    setNichoOutro(lead.nichoOutro);
+    if (lead.nicho) {
+      const n = getNicho(config.nichos, lead.nicho);
+      const patch: Partial<CalcState> = { nicho: lead.nicho, cpl: n ? n.cpl : 0 };
+      if (n) {
+        if (state.ticket === 0 && n.ticketPadrao) patch.ticket = n.ticketPadrao;
+        if (state.cicloDias === 0 && n.cicloPadrao) patch.cicloDias = n.cicloPadrao;
+      }
+      set(patch);
+    }
+  };
 
   const set = (patch: Partial<CalcState>) => setState((s) => ({ ...s, ...patch }));
   const setRate = (k: keyof CalcState["rates"], pct: number) =>
@@ -330,6 +383,7 @@ export default function Calculadora({
     setTelefone("");
     setNichoEspecifico("");
     setNichoOutro("");
+    setSelectedLeadId("");
     setPreparadoPor(user.nome ?? "");
     setObservacoes("");
     setDataCall(hojeBR());
@@ -373,6 +427,33 @@ export default function Calculadora({
           title="Dados da call"
           sub="Preenchido junto com o cliente. Vai também no cabeçalho do PDF final."
         >
+          {ghlLeads.length > 0 && (
+            <Field
+              label="Puxar lead do GHL (Reunião agendada)"
+              htmlFor="ghlLeadSelect"
+              hint="Opcional — preenche nome, telefone e nicho automaticamente."
+              className="mb-5"
+            >
+              <select
+                id="ghlLeadSelect"
+                value={selectedLeadId}
+                onChange={(e) => selecionarLeadGhl(e.target.value)}
+                className="w-full border-[1.5px] border-line rounded-lg px-3 py-2.5 text-[14px] text-ink bg-surface font-medium focus:outline-none focus:border-brand"
+              >
+                <option value="">Selecione um lead…</option>
+                {ghlLeads.map((l) => (
+                  <option key={l.opportunityId} value={l.opportunityId}>
+                    {l.cliente}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {ghlLeadsStatus === "erro" && (
+            <p className="text-[12px] text-ink-3 mb-4">
+              Não foi possível carregar os leads do GHL agora — preencha manualmente abaixo.
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4">
             <Field label="Nome do cliente / empresa" htmlFor="clienteNome">
               <TextInput
